@@ -12,4 +12,5 @@ public class ChatResponse {
     private String plan;
     private String answer;
     private List<String> suggestions;
+    private boolean finalChunk;
 }

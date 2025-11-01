@@ -9,10 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -31,6 +29,7 @@ public class ChatController {
         if (request.getQuestion() == null || request.getQuestion().isBlank()) {
             return Flux.just(ErrorResponse.builder().error("Missing question").code("MISSING_QUESTION").build());
         }
+
         return chatService.streamAnswer(conversationId, request.getQuestion())
                 .cast(Object.class)
                 .onErrorResume(e -> {
