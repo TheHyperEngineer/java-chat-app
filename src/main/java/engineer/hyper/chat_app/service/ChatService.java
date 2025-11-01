@@ -1,47 +1,45 @@
 package engineer.hyper.chat_app.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import engineer.hyper.chat_app.model.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration; // Import Duration
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
     private final ChatModel chatModel;
     private final ChatMemory chatMemory;
-    private final ObjectMapper objectMapper;
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
     private static final String SYSTEM_PROMPT = """
-            You are a helpful conversation assistant.
-            You MUST follow all of the following rules strictly:
-            1. Your entire response MUST be a single, valid JSON object. Do not include any text or markdown outside of this JSON object.
-            2. The JSON object must have exactly three keys in this exact order: "plan", "answer", and "suggestions".
-            3. The "plan" value must be a JSON array of strings.
-            4. The "answer" value must be a single JSON string.
-            5. The "suggestions" value must be a JSON array of strings.
-            6. Ensure all brackets, braces, and quotes are correctly opened and closed. Do not stop generating until the final closing brace '}' of the JSON object is complete.
+            You are a playful and helpful conversation assistant.
+            You must follow all of the following rules strictly:
+            1.  First, think about a step-by-step plan to answer the user's question.
+            2.  Your final response must be structured in three distinct parts, in the exact following order, using the specified markdown headers.
+            3.  The parts are: '### Plan', '### Answer', and '### Suggestions'.
+            4.  Under '### Plan', provide your step-by-step plan as a numbered list.
+            5.  Under '### Answer', provide the detailed answer to the user's question.
+            6.  Under '### Suggestions', provide a numbered list of three relevant follow-up questions.
+            7.  Do not add any other headers or sections.
             """;
 
-    public ChatService(ChatModel chatModel, ChatMemory chatMemory, ObjectMapper objectMapper) {
+    public ChatService(ChatModel chatModel, ChatMemory chatMemory) {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
-        this.objectMapper = objectMapper;
     }
 
     public Flux<ChatResponse> streamAnswer(String conversationId, String question) {
@@ -52,145 +50,70 @@ public class ChatService {
         messages.add(userMessage);
 
         Prompt prompt = new Prompt(messages);
-        StringBuilder fullResponseAggregator = new StringBuilder();
-        AtomicBoolean suggestionsEmitted = new AtomicBoolean(false);
 
-        Flux<ChatResponse> mainStream = parseJsonStream(chatModel.stream(prompt)
-                        .map(response -> response.getResult().getOutput().getText())
-                        .doOnNext(fullResponseAggregator::append),
-                question,
-                conversationId,
-                suggestionsEmitted);
+        Flux<String> sharedFlux = chatModel.stream(prompt)
+                .map(response -> response.getResult().getOutput().getText())
+                .share();
 
-        // CORRECTED: Use concatWith(Mono.defer(...)) for conditional completion.
-        return mainStream.concatWith(Mono.defer(() -> {
-                    // This logic is now executed only after the mainStream completes.
-                    if (!suggestionsEmitted.get()) {
-                        // If suggestions were never sent, emit a final, empty chunk to terminate the stream gracefully.
-                        return Mono.just(ChatResponse.builder()
-                                .orderId(999)
-                                .question(question)
-                                .conversationId(conversationId)
-                                .plan(Collections.emptyList())
-                                .answer(null)
-                                .suggestions(Collections.emptyList())
-                                .finalChunk(true)
-                                .build());
-                    }
-                    // If suggestions were already emitted and marked as final, complete the stream without adding anything.
-                    return Mono.empty();
-                }))
-                .doOnTerminate(() -> {
-                    String fullContent = fullResponseAggregator.toString();
+        Flux<ChatResponse> intermediateAnswerChunks = sharedFlux
+                .skipUntil(text -> text.contains("### Answer"))
+                .takeUntil(text -> text.contains("### Suggestions"))
+                .map(text -> text.replace("### Answer", "").replaceAll("### Suggestions.*", ""))
+                .filter(text -> !text.isBlank())
+                // ADDED: Introduce a 50ms delay between each answer chunk for a typewriter effect.
+                .delayElements(Duration.ofMillis(50))
+                .map(answerText -> ChatResponse.builder()
+                        .answer(answerText)
+                        .build());
+
+        Mono<ChatResponse> finalStructuredChunk = sharedFlux
+                .collect(Collectors.joining())
+                .doOnSuccess(fullContent -> {
                     if (!fullContent.isBlank()) {
                         AssistantMessage assistantMessage = new AssistantMessage(fullContent);
                         chatMemory.add(conversationId, List.of(userMessage, assistantMessage));
                         log.info("Saved conversation history for ID: {}", conversationId);
                     }
+                })
+                .map(fullContent -> {
+                    List<String> plan = parseListSection(fullContent, "### Plan", "### Answer");
+                    List<String> suggestions = parseListSection(fullContent, "### Suggestions", null);
+                    return ChatResponse.builder()
+                            .plan(plan)
+                            .suggestions(suggestions)
+                            .finalChunk(true)
+                            .build();
+                });
+
+        AtomicInteger orderIdCounter = new AtomicInteger(0);
+
+        return Flux.concat(intermediateAnswerChunks, finalStructuredChunk.flux())
+                .map(response -> {
+                    response.setOrderId(orderIdCounter.incrementAndGet());
+                    response.setQuestion(question);
+                    response.setConversationId(conversationId);
+                    return response;
                 });
     }
 
-    private Flux<ChatResponse> parseJsonStream(Flux<String> jsonChunks, String question, String conversationId, AtomicBoolean suggestionsEmitted) {
-        StringBuilder buffer = new StringBuilder();
-        AtomicInteger orderId = new AtomicInteger(0);
-
-        return jsonChunks.concatMap(chunk -> {
-            buffer.append(chunk);
-            List<ChatResponse> emittedResponses = new ArrayList<>();
-            while (true) {
-                String currentBuffer = buffer.toString();
-                int keyIndex = findNextKey(currentBuffer);
-                if (keyIndex == -1) break;
-
-                String key = parseKey(currentBuffer, keyIndex);
-                int valueStartIndex = findValueStart(currentBuffer, keyIndex);
-                if (valueStartIndex == -1) break;
-
-                int valueEndIndex = findValueEnd(currentBuffer, valueStartIndex);
-                if (valueEndIndex == -1) break;
-
-                String value = currentBuffer.substring(valueStartIndex, valueEndIndex + 1);
-                emittedResponses.add(createResponseChunk(key, value, question, conversationId, orderId.incrementAndGet(), suggestionsEmitted));
-
-                buffer.delete(0, valueEndIndex + 1);
-            }
-            return Flux.fromIterable(emittedResponses);
-        });
-    }
-
-    private int findNextKey(String buffer) {
-        int planIndex = buffer.indexOf("\"plan\"");
-        int answerIndex = buffer.indexOf("\"answer\"");
-        int suggestionsIndex = buffer.indexOf("\"suggestions\"");
-
-        int minIndex = Integer.MAX_VALUE;
-        if (planIndex != -1) minIndex = Math.min(minIndex, planIndex);
-        if (answerIndex != -1) minIndex = Math.min(minIndex, answerIndex);
-        if (suggestionsIndex != -1) minIndex = Math.min(minIndex, suggestionsIndex);
-
-        return minIndex == Integer.MAX_VALUE ? -1 : minIndex;
-    }
-
-    private String parseKey(String buffer, int keyIndex) {
-        int endQuoteIndex = buffer.indexOf('"', keyIndex + 1);
-        return buffer.substring(keyIndex + 1, endQuoteIndex);
-    }
-
-    private int findValueStart(String buffer, int keyIndex) {
-        int colonIndex = buffer.indexOf(':', keyIndex);
-        if (colonIndex == -1) return -1;
-        for (int i = colonIndex + 1; i < buffer.length(); i++) {
-            char c = buffer.charAt(i);
-            if (!Character.isWhitespace(c)) return i;
-        }
-        return -1;
-    }
-
-    private int findValueEnd(String buffer, int valueStartIndex) {
-        char startChar = buffer.charAt(valueStartIndex);
-        if (startChar == '"') {
-            for (int i = valueStartIndex + 1; i < buffer.length(); i++) {
-                if (buffer.charAt(i) == '"' && buffer.charAt(i - 1) != '\\') {
-                    return i;
-                }
-            }
-        } else if (startChar == '[') {
-            int depth = 1;
-            for (int i = valueStartIndex + 1; i < buffer.length(); i++) {
-                char c = buffer.charAt(i);
-                if (c == '[') depth++;
-                if (c == ']') depth--;
-                if (depth == 0) return i;
-            }
-        }
-        return -1;
-    }
-
-    private ChatResponse createResponseChunk(String key, String value, String question, String conversationId, int orderId, AtomicBoolean suggestionsEmitted) {
-        ChatResponse.ChatResponseBuilder builder = ChatResponse.builder()
-                .orderId(orderId)
-                .question(question)
-                .conversationId(conversationId);
-
+    private List<String> parseListSection(String content, String startHeader, String endHeader) {
         try {
-            switch (key) {
-                case "plan":
-                    builder.plan(objectMapper.readValue(value, new TypeReference<List<String>>() {})).finalChunk(false);
-                    break;
-                case "answer":
-                    builder.answer(objectMapper.readValue(value, String.class)).finalChunk(false);
-                    break;
-                case "suggestions":
-                    builder.suggestions(objectMapper.readValue(value, new TypeReference<List<String>>() {})).finalChunk(true);
-                    suggestionsEmitted.set(true);
-                    break;
-                default:
-                    builder.finalChunk(false);
-            }
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to parse JSON value for key '{}'. Value: '{}'", key, value, e);
-            builder.plan(List.of("Error parsing chunk for: " + key)).finalChunk(false);
+            int startIndex = content.indexOf(startHeader);
+            if (startIndex == -1) return Collections.emptyList();
+
+            int endIndex = (endHeader != null) ? content.indexOf(endHeader, startIndex) : content.length();
+            if (endIndex == -1) endIndex = content.length();
+
+            String sectionBlock = content.substring(startIndex + startHeader.length(), endIndex).trim();
+
+            return sectionBlock.lines()
+                    .map(String::trim)
+                    .filter(line -> !line.isBlank())
+                    .map(line -> line.replaceAll("^\\d+\\.\\s*", ""))
+                    .toList();
+        } catch (Exception e) {
+            log.error("Error parsing section '{}'", startHeader, e);
+            return Collections.emptyList();
         }
-        return builder.build();
     }
 }
