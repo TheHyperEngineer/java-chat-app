@@ -1,7 +1,7 @@
 package engineer.hyper.chat_app.controller;
 
-import engineer.hyper.chat_app.model.Session;
 import engineer.hyper.chat_app.model.ErrorResponse;
+import engineer.hyper.chat_app.model.Session;
 import engineer.hyper.chat_app.service.SessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

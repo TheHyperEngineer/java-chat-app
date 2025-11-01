@@ -4,15 +4,17 @@ import engineer.hyper.chat_app.model.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.messages.*;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration; // Import Duration
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -60,11 +62,8 @@ public class ChatService {
                 .takeUntil(text -> text.contains("### Suggestions"))
                 .map(text -> text.replace("### Answer", "").replaceAll("### Suggestions.*", ""))
                 .filter(text -> !text.isBlank())
-                // ADDED: Introduce a 50ms delay between each answer chunk for a typewriter effect.
                 .delayElements(Duration.ofMillis(50))
-                .map(answerText -> ChatResponse.builder()
-                        .answer(answerText)
-                        .build());
+                .map(answerText -> ChatResponse.builder().answer(answerText).build());
 
         Mono<ChatResponse> finalStructuredChunk = sharedFlux
                 .collect(Collectors.joining())
@@ -100,12 +99,9 @@ public class ChatService {
         try {
             int startIndex = content.indexOf(startHeader);
             if (startIndex == -1) return Collections.emptyList();
-
             int endIndex = (endHeader != null) ? content.indexOf(endHeader, startIndex) : content.length();
             if (endIndex == -1) endIndex = content.length();
-
             String sectionBlock = content.substring(startIndex + startHeader.length(), endIndex).trim();
-
             return sectionBlock.lines()
                     .map(String::trim)
                     .filter(line -> !line.isBlank())
