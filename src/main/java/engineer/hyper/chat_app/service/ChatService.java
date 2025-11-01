@@ -17,8 +17,8 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
@@ -27,7 +27,6 @@ public class ChatService {
     private final ObjectMapper objectMapper;
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
-    // REINFORCED PROMPT: This is our first line of defense against malformed JSON.
     private static final String SYSTEM_PROMPT = """
             You are a helpful conversation assistant.
             You MUST follow all of the following rules strictly:
@@ -54,14 +53,34 @@ public class ChatService {
 
         Prompt prompt = new Prompt(messages);
         StringBuilder fullResponseAggregator = new StringBuilder();
+        AtomicBoolean suggestionsEmitted = new AtomicBoolean(false);
 
-        // This is the core of the resilient streaming logic.
-        return parseJsonStream(chatModel.stream(prompt)
+        Flux<ChatResponse> mainStream = parseJsonStream(chatModel.stream(prompt)
                         .map(response -> response.getResult().getOutput().getText())
-                        .doOnNext(fullResponseAggregator::append), // Aggregate the full text for saving history
+                        .doOnNext(fullResponseAggregator::append),
                 question,
-                conversationId)
-                .doOnTerminate(() -> { // This runs on completion or error
+                conversationId,
+                suggestionsEmitted);
+
+        // CORRECTED: Use concatWith(Mono.defer(...)) for conditional completion.
+        return mainStream.concatWith(Mono.defer(() -> {
+                    // This logic is now executed only after the mainStream completes.
+                    if (!suggestionsEmitted.get()) {
+                        // If suggestions were never sent, emit a final, empty chunk to terminate the stream gracefully.
+                        return Mono.just(ChatResponse.builder()
+                                .orderId(999)
+                                .question(question)
+                                .conversationId(conversationId)
+                                .plan(Collections.emptyList())
+                                .answer(null)
+                                .suggestions(Collections.emptyList())
+                                .finalChunk(true)
+                                .build());
+                    }
+                    // If suggestions were already emitted and marked as final, complete the stream without adding anything.
+                    return Mono.empty();
+                }))
+                .doOnTerminate(() -> {
                     String fullContent = fullResponseAggregator.toString();
                     if (!fullContent.isBlank()) {
                         AssistantMessage assistantMessage = new AssistantMessage(fullContent);
@@ -71,82 +90,45 @@ public class ChatService {
                 });
     }
 
-    /**
-     * This method implements the stateful, real-time JSON value parser.
-     * It transforms a Flux of JSON string chunks into a Flux of structured ChatResponse objects.
-     */
-    private Flux<ChatResponse> parseJsonStream(Flux<String> jsonChunks, String question, String conversationId) {
-        // State machine variables
+    private Flux<ChatResponse> parseJsonStream(Flux<String> jsonChunks, String question, String conversationId, AtomicBoolean suggestionsEmitted) {
         StringBuilder buffer = new StringBuilder();
-        AtomicInteger braceDepth = new AtomicInteger(0);
         AtomicInteger orderId = new AtomicInteger(0);
 
         return jsonChunks.concatMap(chunk -> {
             buffer.append(chunk);
             List<ChatResponse> emittedResponses = new ArrayList<>();
-
-            // Process the buffer to find and emit complete JSON values.
-            // This loop allows us to emit multiple complete values if they arrive in a single chunk.
             while (true) {
                 String currentBuffer = buffer.toString();
                 int keyIndex = findNextKey(currentBuffer);
-                if (keyIndex == -1) break; // No key found yet, need more data.
+                if (keyIndex == -1) break;
 
                 String key = parseKey(currentBuffer, keyIndex);
                 int valueStartIndex = findValueStart(currentBuffer, keyIndex);
-                if (valueStartIndex == -1) break; // Key found, but value hasn't started.
+                if (valueStartIndex == -1) break;
 
                 int valueEndIndex = findValueEnd(currentBuffer, valueStartIndex);
-                if (valueEndIndex == -1) break; // Value started, but not yet complete.
+                if (valueEndIndex == -1) break;
 
-                // We have a complete key-value pair.
                 String value = currentBuffer.substring(valueStartIndex, valueEndIndex + 1);
-                emittedResponses.add(createResponseChunk(key, value, question, conversationId, orderId.incrementAndGet()));
+                emittedResponses.add(createResponseChunk(key, value, question, conversationId, orderId.incrementAndGet(), suggestionsEmitted));
 
-                // Reset buffer to the remaining unprocessed part.
                 buffer.delete(0, valueEndIndex + 1);
             }
             return Flux.fromIterable(emittedResponses);
-        }).concatWith(
-                // This Mono acts as the final chunk emitter when the source completes.
-                Mono.fromCallable(() -> {
-                            // Check if there's any remaining buffer content that might be the start of the suggestions.
-                            // This handles the case where the stream ends exactly on the last ']' of suggestions.
-                            String finalBuffer = buffer.toString();
-                            if (finalBuffer.contains("\"suggestions\"")) {
-                                int keyIndex = findNextKey(finalBuffer);
-                                String key = parseKey(finalBuffer, keyIndex);
-                                int valueStartIndex = findValueStart(finalBuffer, keyIndex);
-                                int valueEndIndex = findValueEnd(finalBuffer, valueStartIndex);
-                                if (valueEndIndex != -1) {
-                                    String value = finalBuffer.substring(valueStartIndex, valueEndIndex + 1);
-                                    return createResponseChunk(key, value, question, conversationId, orderId.incrementAndGet());
-                                }
-                            }
-                            // If no complete value is found in the buffer, we still need a final chunk.
-                            return ChatResponse.builder()
-                                    .orderId(orderId.incrementAndGet())
-                                    .question(question)
-                                    .conversationId(conversationId)
-                                    .plan(Collections.emptyList())
-                                    .answer(null)
-                                    .suggestions(Collections.emptyList())
-                                    .finalChunk(true)
-                                    .build();
-                        })
-                        .map(response -> {
-                            // Ensure the very last response is marked as the final chunk.
-                            response.setFinalChunk(true);
-                            return response;
-                        })
-        );
+        });
     }
 
-    // Helper methods for the stateful parser
     private int findNextKey(String buffer) {
-        return buffer.indexOf("\"plan\"") != -1 ? buffer.indexOf("\"plan\"") :
-                buffer.indexOf("\"answer\"") != -1 ? buffer.indexOf("\"answer\"") :
-                        buffer.indexOf("\"suggestions\"") != -1 ? buffer.indexOf("\"suggestions\"") : -1;
+        int planIndex = buffer.indexOf("\"plan\"");
+        int answerIndex = buffer.indexOf("\"answer\"");
+        int suggestionsIndex = buffer.indexOf("\"suggestions\"");
+
+        int minIndex = Integer.MAX_VALUE;
+        if (planIndex != -1) minIndex = Math.min(minIndex, planIndex);
+        if (answerIndex != -1) minIndex = Math.min(minIndex, answerIndex);
+        if (suggestionsIndex != -1) minIndex = Math.min(minIndex, suggestionsIndex);
+
+        return minIndex == Integer.MAX_VALUE ? -1 : minIndex;
     }
 
     private String parseKey(String buffer, int keyIndex) {
@@ -166,13 +148,13 @@ public class ChatService {
 
     private int findValueEnd(String buffer, int valueStartIndex) {
         char startChar = buffer.charAt(valueStartIndex);
-        if (startChar == '"') { // It's a string value
+        if (startChar == '"') {
             for (int i = valueStartIndex + 1; i < buffer.length(); i++) {
                 if (buffer.charAt(i) == '"' && buffer.charAt(i - 1) != '\\') {
                     return i;
                 }
             }
-        } else if (startChar == '[') { // It's an array value
+        } else if (startChar == '[') {
             int depth = 1;
             for (int i = valueStartIndex + 1; i < buffer.length(); i++) {
                 char c = buffer.charAt(i);
@@ -181,32 +163,33 @@ public class ChatService {
                 if (depth == 0) return i;
             }
         }
-        return -1; // Not found
+        return -1;
     }
 
-    private ChatResponse createResponseChunk(String key, String value, String question, String conversationId, int orderId) {
+    private ChatResponse createResponseChunk(String key, String value, String question, String conversationId, int orderId, AtomicBoolean suggestionsEmitted) {
         ChatResponse.ChatResponseBuilder builder = ChatResponse.builder()
                 .orderId(orderId)
                 .question(question)
-                .conversationId(conversationId)
-                .finalChunk(false); // Default to false, will be updated by the final mono.
+                .conversationId(conversationId);
 
         try {
             switch (key) {
                 case "plan":
-                    builder.plan(objectMapper.readValue(value, new TypeReference<List<String>>() {}));
+                    builder.plan(objectMapper.readValue(value, new TypeReference<List<String>>() {})).finalChunk(false);
                     break;
                 case "answer":
-                    builder.answer(objectMapper.readValue(value, String.class));
+                    builder.answer(objectMapper.readValue(value, String.class)).finalChunk(false);
                     break;
                 case "suggestions":
-                    builder.suggestions(objectMapper.readValue(value, new TypeReference<List<String>>() {}));
+                    builder.suggestions(objectMapper.readValue(value, new TypeReference<List<String>>() {})).finalChunk(true);
+                    suggestionsEmitted.set(true);
                     break;
+                default:
+                    builder.finalChunk(false);
             }
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse JSON value for key '{}'. Value: '{}'", key, value, e);
-            // Gracefully handle parsing error for a chunk, maybe send an error message.
-            builder.plan(List.of("Error parsing chunk for: " + key));
+            builder.plan(List.of("Error parsing chunk for: " + key)).finalChunk(false);
         }
         return builder.build();
     }
