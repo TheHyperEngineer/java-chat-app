@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-@Service
+//@Service
 public class CodeOrchestratorAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CodeOrchestratorAgent.class);
@@ -30,15 +30,15 @@ public class CodeOrchestratorAgent {
 
             // 1. Coder Agent generates code
             log.info("...Calling Coder Agent.");
-            String code = coderAgent.generateCode(new AgentDto.CodeRequest(userRequest, feedback));
+            String code = "";//coderAgent.generateCode(new AgentDto.CodeRequest(userRequest, feedback));
 
             // 2. Tester Agent generates tests
             log.info("...Calling Tester Agent.");
-            String tests = testerAgent.generateTests(new AgentDto.TestRequest(code, userRequest));
+            String tests = "";//testerAgent.generateTests(new AgentDto.TestRequest(code, userRequest));
 
             // 3. Reviewer Agent reviews
             log.info("...Calling Reviewer Agent.");
-            AgentDto.ReviewResponse review = reviewerAgent.reviewCodeAndTests(new AgentDto.ReviewRequest(code, tests));
+            AgentDto.ReviewResponse review = null;//reviewerAgent.reviewCodeAndTests(new AgentDto.ReviewRequest(code, tests));
 
             // 4. Check review and decide next step
             if (review.status() == AgentDto.ReviewStatus.APPROVED) {

@@ -12,13 +12,13 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
 public class ChatController {
-
     private final OrchestratorService orchestratorService;
     private final SessionService sessionService;
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
@@ -32,11 +32,21 @@ public class ChatController {
             return Flux.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing question"));
         }
 
-        // CHANGED: A single, clean call to the orchestrator
         return orchestratorService.delegateRequest(conversationId, request.getQuestion())
+                // REFACTORED: This block now sends a final, structured error message to the UI.
                 .onErrorResume(e -> {
-                    log.error("Error streaming chat for conversationId {}:", conversationId, e);
-                    return Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error during streaming"));
+                    log.error("An unrecoverable error occurred in the stream for conversationId {}:", conversationId, e);
+                    // Create a user-friendly error response.
+                    ChatResponse errorResponse = ChatResponse.builder()
+                            .orderId(999)
+                            .question(request.getQuestion())
+                            .conversationId(conversationId)
+                            .plan(List.of("An internal error occurred."))
+                            .answer("Sorry, I was unable to process your request. Please try again later.")
+                            .finalChunk(true) // IMPORTANT: Signal to the UI that the stream is over.
+                            .build();
+                    // Return it as a single-element Flux.
+                    return Flux.just(errorResponse);
                 });
     }
 }
