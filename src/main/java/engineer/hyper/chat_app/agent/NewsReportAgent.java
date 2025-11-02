@@ -1,6 +1,8 @@
 package engineer.hyper.chat_app.agent;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -12,12 +14,15 @@ import java.util.stream.Collectors;
 class NewsReportAgent {
     private final ChatClient chatClient;
 
-    public NewsReportAgent(ChatClient.Builder builder) {
-        this.chatClient = builder.build();
+    // DEFINITIVE SOLUTION: Inject the provider and register the tools.
+    public NewsReportAgent(SyncMcpToolCallbackProvider toolCallbackProvider, ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
+                .build();
     }
 
     public Mono<String> writeArticle(String topic) {
-        String systemPrompt = "You are a news reporter. Write a short, engaging news article on the given topic based on your general knowledge. Respond with only the article text.";
+        String systemPrompt = "You are a news reporter. You MUST use the 'get-latest-news' tool to research the topic before writing a short, engaging news article.";
         return chatClient.prompt()
                 .system(systemPrompt)
                 .user(topic)
@@ -29,18 +34,19 @@ class NewsReportAgent {
 class TweetAgent {
     private final ChatClient chatClient;
 
-    public TweetAgent(ChatClient.Builder builder) {
-        this.chatClient = builder.build();
+    // DEFINITIVE SOLUTION: Inject the provider and register the tools.
+    public TweetAgent(SyncMcpToolCallbackProvider toolCallbackProvider, ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
+                .build();
     }
 
     public Mono<List<String>> generateTweets(String topic) {
-        // REINFORCED PROMPT
-        String systemPrompt = "You are a social media manager. Generate exactly 2 engaging tweets about the given topic. Separate each tweet with a newline. DO NOT include empty lines, numbering, or any other text.";
+        String systemPrompt = "You are a social media manager. Generate exactly 2 engaging tweets about the given topic. Use the 'get-trending-topics' tool to find relevant trends to include. Separate each tweet with a newline. DO NOT include empty lines or numbering.";
         return chatClient.prompt()
                 .system(systemPrompt)
                 .user(topic)
                 .stream().content().collect(Collectors.joining())
-                // ADDED: Programmatic safeguard to filter out empty strings.
                 .map(response -> Arrays.stream(response.split("\n"))
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.toList()));
@@ -51,18 +57,19 @@ class TweetAgent {
 class SocialMediaAgent {
     private final ChatClient chatClient;
 
-    public SocialMediaAgent(ChatClient.Builder builder) {
-        this.chatClient = builder.build();
+    // DEFINITIVE SOLUTION: Inject the provider and register the tools.
+    public SocialMediaAgent(SyncMcpToolCallbackProvider toolCallbackProvider, ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
+                .build();
     }
 
     public Mono<List<String>> generateHashtags(String topic) {
-        // REINFORCED PROMPT
-        String systemPrompt = "You are a social media expert. Generate a list of 5 relevant hashtags for the given topic. Separate each hashtag with a space. DO NOT include empty lines, numbering, or any other text. Example: #Topic1 #Topic2 #Topic3";
+        String systemPrompt = "You are a social media expert. Generate a list of 5 relevant hashtags for the given topic. Use the 'get-trending-topics' tool to find relevant trends to include. Separate each hashtag with a space. DO NOT include empty lines or numbering.";
         return chatClient.prompt()
                 .system(systemPrompt)
                 .user(topic)
                 .stream().content().collect(Collectors.joining())
-                // ADDED: Programmatic safeguard to filter out empty strings.
                 .map(response -> Arrays.stream(response.split("\\s+"))
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.toList()));
@@ -73,11 +80,11 @@ class SocialMediaAgent {
 class CriticAgent {
     private final ChatClient chatClient;
 
+    // This agent has no tools, so its constructor is simple.
     public CriticAgent(ChatClient.Builder builder) {
         this.chatClient = builder.build();
     }
 
-    // CHANGED: Returns a simple Mono<String> with a text-based contract.
     public Mono<String> review(NewsAgentDto.CombinedReport report) {
         String systemPrompt = """
                 You are a critical editor. Review the combined news report.

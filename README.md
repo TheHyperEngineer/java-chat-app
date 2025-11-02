@@ -1,129 +1,139 @@
 
 # 📰 Welcome to Our Super Story Factory! 📰
 
-Hello there! This is a very, very magical place. It's a factory that can create stories about anything in the whole wide world!
+Hello again, friend! Our Magic Chat Box has gotten even more magical!
 
-You can ask it for a story about puppies, or space rockets, or even spooky Halloween! The factory workers will get right to it and create a special news report just for you.
-
-It's part of our **Magic Chat Box**, which can also just have a friendly chat with you.
+It's a factory that creates amazing news stories for you about anything you can imagine. But now, the little robots inside have a new superpower that lets them learn about things happening in the **real world, right now!**
 
 <br>
 
-## How The Factory Works ✨
+## The Robots Have a New Superpower: Magic Binoculars! 🔭
 
-When you send a message, it first goes to the **Big Boss Robot 🧠**. The Big Boss is super smart and reads your message to figure out what you want.
+Imagine our factory is in a little box. Before, the robots could only use what they already knew inside the box.
 
-The Big Boss asks one question: "Does my friend want to chat, build a program, or get a news story?"
+But now, we've given them **Magic Binoculars**!
 
-Here is a map of the Big Boss's big decision:
+With these binoculars, the robots can look outside the factory window and see the whole wide world (the internet!).
+
+*   The **Story Writer Robot** can use the binoculars to see the latest, breaking news about your topic!
+*   The **Sticker Maker Robot** can use them to see what fun sticker words (hashtags) are popular today!
+
+This means your stories will be fresh and new, every single time!
+
+Here is a map of how they use their new superpower:
 
 ```mermaid
 graph TD
-    A[You Send a Message 💌] --> B{Magic Chat Box};
-    B --> C[The Big Boss Robot 🧠];
-    C --> D{What does my friend want?};
-    D -- "Just a chat!" --> E[Storyteller Robot 📖];
-    D -- "Build a program!" --> F[Team of Coding Robots 👷‍♂️];
-    D -- "A news story!" --> G[The News Desk Team 📰];
-    E --> H[Tells you a story...];
-    F --> H[Builds the program...];
-    G --> H[Creates the news report...];
-    H --> I[You See the Result! 😄];
+    A[A Robot has a question] --> B{Use Magic Binoculars?};
+    B -- "Yes!" --> C[Looks outside the factory...];
+    C --> D[Sees the real world! 🌍];
+    D --> E[Gets the newest information!];
+    E --> F[Uses the info to do a better job!];
+    B -- "No, I already know!" --> F;
 
     style C fill:#87CEEB,stroke:#333,stroke-width:2px
-    style G fill:#FFB6C1,stroke:#333,stroke-width:2px
 ```
 
 <br>
 
-## Meet the News Desk Team! 🖋️🐦🏷️🧐
+## Meet the Super-Powered News Desk Team! 🖋️🐦🏷️🧐
 
-When you ask for a news story, the Big Boss calls the special **News Desk Team**! They are the best story makers in the world.
+When you ask for a news story, the **Big Boss Robot 🧠** still calls the special **News Desk Team**. But now, they have their new tools!
 
-There are four robots on this team:
+1.  **The Story Writer (`NewsReportAgent`)**: It uses its Magic Binoculars to research the latest news before writing the main article.
+2.  **The Quick Message Writer (`TweetAgent`)**: It writes tiny, short messages for the blue bird app (Twitter).
+3.  **The Sticker Maker (`SocialMediaAgent`)**: It uses its Magic Binoculars to find popular sticker words (hashtags) to help people find the story.
+4.  **The Grumpy Inspector (`CriticAgent`)**: This very picky robot still checks everyone's work to make sure it's perfect.
 
-1.  **The Story Writer (`NewsReportAgent`)**: This robot is a super-fast writer. It writes the main news article for you.
-2.  **The Quick Message Writer (`TweetAgent`)**: This robot writes tiny, short messages, like the kind you see on the blue bird app (Twitter).
-3.  **The Sticker Maker (`SocialMediaAgent`)**: This robot makes fun sticker words (hashtags!) that help other people find your story.
-4.  **The Grumpy Inspector (`CriticAgent`)**: This robot is very, very picky! Its job is to read everyone's work and make sure it's perfect.
+### The Super-Duper Quality Check Game!
 
-### The Super-Important Quality Check!
+The team's game is now even more exciting with their new superpowers!
 
-The team wants to make sure you get the best story ever. So, they have a special game to check their work.
-
-1.  The Big Boss tells the team the topic (like "Halloween").
-2.  The Story Writer, Quick Message Writer, and Sticker Maker all work **at the same time** in their own little rooms. This is super fast!
-3.  They put all their work together into a big folder.
-4.  The folder goes to the **Grumpy Inspector**.
+1.  The Big Boss tells the team the topic (like "the latest space rocket launch").
+2.  The Story Writer and Sticker Maker **first use their Magic Binoculars** to look for the newest information.
+3.  Then, all three writers (Story, Tweet, and Sticker) work **at the same time** to create their parts.
+4.  They put all their work into a folder and give it to the **Grumpy Inspector**.
 5.  The Inspector reads everything.
-    -   If it's amazing, the Inspector shouts **"APPROVED! ✅"** and the story is ready for you!
-    -   If something is silly (like a boring tweet), the Inspector shouts **"REJECTED! ❌"** and writes notes on how to make it better.
-6.  If it was rejected, the Big Boss reads the notes and tells the team to **try again**, but with the new, better instructions! They get one more chance to make it perfect.
+    -   If it's amazing, the Inspector shouts **"APPROVED! ✅"** and the story is ready!
+    -   If something is wrong, the Inspector shouts **"REJECTED! ❌"** and writes notes on how to make it better.
+6.  If it was rejected, the team **tries again** with the new, better instructions!
 
-Here is a map of their quality check game:
+Here is a map of their new and improved game:
 
 ```mermaid
 graph TD
-    subgraph The News Desk's Game
-        A[The team finishes their work] --> B[Folder with Story, Tweets, & Stickers];
-        B --> C{The Grumpy Inspector <br> (Is it perfect?)};
-        C -- "✅ YES! APPROVED!" --> D[✨ All Done! Show the User!];
-        C -- "❌ NO! REJECTED!" --> E[Inspector writes notes...];
-        E --> F[Big Boss tells the team to try again <br> with the new notes];
-        F --> A;
+    subgraph The News Desk's Super-Powered Game
+        A[The team gets the project topic] --> B{Use Magic Binoculars? 🔭};
+        B -- "Story Writer & Sticker Maker say YES!" --> C[They look outside the factory <br> for the latest info!];
+        C --> D[The team creates the Story, <br> Tweets, & Stickers all at once];
+        D --> E[Folder with all the work];
+        E --> F{The Grumpy Inspector <br> (Is it perfect?)};
+        F -- "✅ YES! APPROVED!" --> G[✨ All Done! Show the User!];
+        F -- "❌ NO! REJECTED!" --> H[Inspector writes notes...];
+        H --> A;
     end
 
-    style C fill:#FFA07A,stroke:#333,stroke-width:2px
+    style C fill:#87CEEB,stroke:#333,stroke-width:2px
+    style F fill:#FFA07A,stroke:#333,stroke-width:2px
 ```
 
 <br>
 
 ## For the Grown-Ups (What the Code Does) 🤓
 
-This project demonstrates a resilient, parallel, multi-agent workflow using **Spring AI** and **Project Reactor**.
+This project demonstrates a resilient, tool-using, multi-agent workflow using **Spring AI's Model Context Protocol (MCP)**.
 
-*   **The Big Boss** is the `OrchestratorService`. It uses an LLM call with a `BeanOutputConverter` to classify user intent into `GENERAL_CHAT`, `CODE_GENERATION`, or `NEWS_REPORT`.
-*   **The News Desk Team** is managed by the `NewsOrchestratorService`.
-    *   It uses **`Mono.zip`** to execute the `NewsReportAgent`, `TweetAgent`, and `SocialMediaAgent` in parallel, significantly speeding up the process.
-    *   It uses **`Mono.expand`** to implement the non-blocking, reactive critique-and-refine loop.
-*   **Resilient Communication:** The agents in the workflow do not rely on fragile JSON for communication. The `CriticAgent` uses a simple, text-based contract (starting its response with `"APPROVED"` or `"REJECTED"`), which the orchestrator parses. This makes the internal workflow highly resilient to LLM formatting errors.
-*   **User-Friendly Failure:** If the workflow fails after all attempts, it still returns the last generated (but rejected) content to the user, providing valuable context instead of just a generic error message.
+*   **The Tool Shed (`mcp-server`):** We have a separate Spring Boot application that acts as a dedicated tool provider. It uses the `spring-ai-mcp-server-webflux-spring-boot-starter` and exposes tool methods (like `getLatestNews`) annotated with `@Tool`. These tools are connected to the live Google Search API.
+*   **The Factory (`chat-app`):** Our main application is an MCP client.
+    *   It uses the `spring-ai-mcp-client-spring-boot-starter` to automatically connect to the `mcp-server`.
+    *   The `SyncMcpToolCallbackProvider` bean is automatically created, making all remote tools available for dependency injection.
+*   **Tool-Enabled Agents:** The `NewsReportAgent`, `TweetAgent`, and `SocialMediaAgent` are now configured to use these remote tools. Their `ChatClient` instances are built using `defaultToolCallbacks` to register the tools provided by the `SyncMcpToolCallbackProvider`.
+*   **Intelligent Tool Use:** The agents' system prompts are engineered to encourage them to use their assigned tools when necessary, allowing the LLM to decide when to call a function to get external data.
 
 <br>
 
 ## How to Run the App 🚀
 
-You need two windows in your computer's terminal.
+You now need **three** windows in your computer's terminal. This is very important!
 
-1.  **Start the Brain (Backend):**
+1.  **Start the Tool Shed (MCP Server):**
     ```bash
-    # Go to the project folder
-    cd chat-app
+    # Go to the mcp-server project folder
+    cd mcp-server
 
-    # Tell Maven to run the app
+    # Run the app
     ./mvnw spring-boot:run
     ```
 
-2.  **Start the Face (Frontend):**
+2.  **Start the Brain (Backend):**
     ```bash
-    # Go to the ui folder inside the project
-    cd ui
+    # Go to the main chat-app project folder
+    cd chat-app
 
-    # Install all the needed toys
+    # Run the app
+    ./mvnw spring-boot:run
+    ```
+
+3.  **Start the Face (Frontend):**
+    ```bash
+    # Go to the ui folder inside the chat-app project
+    cd chat-app/ui
+
+    # Install toys if you haven't already
     npm install
 
     # Start the app
     npm run dev
     ```
 
-Now open a web browser and go to `http://localhost:5173` to play with the Magic Chat Box!
+Now open a web browser and go to `http://localhost:5173` to play with the super-powered Magic Chat Box!
 
 <br>
 
 ## Coolest Features ⭐
 
-*   **True Word-by-Word Streaming:** The chat feels alive because answers appear one piece at a time.
-*   **A Whole News Desk Team:** The app has a dedicated team of agents for creating news reports, tweets, and hashtags.
-*   **Super Fast Parallel Work:** The specialist agents all work at the same time, just like a real newsroom!
+*   **Connected to the Real World!** The agents can use tools to search the internet for live, up-to-the-minute information.
+*   **A Whole News Desk Team:** A dedicated team of agents for creating news reports, tweets, and hashtags.
+*   **Super Fast Parallel Work:** The specialist agents all work at the same time.
 *   **Critique & Retry Loop:** The agents have a boss that checks their work and makes them try again if it's not perfect.
-*   **Super Resilient:** The agents talk to each other in a simple way that doesn't break easily, making the whole factory very reliable.
+*   **Super Resilient:** The agents talk to each other in a simple way that doesn't break easily.
