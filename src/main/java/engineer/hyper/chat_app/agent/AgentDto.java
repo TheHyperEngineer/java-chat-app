@@ -13,7 +13,8 @@ public class AgentDto {
 
     public enum TaskType {
         CODE_GENERATION,
-        GENERAL_CHAT
+        GENERAL_CHAT,
+        NEWS_REPORT
     }
 
     public record TaskClassification(

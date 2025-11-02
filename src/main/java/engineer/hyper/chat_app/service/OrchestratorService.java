@@ -3,6 +3,7 @@ package engineer.hyper.chat_app.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import engineer.hyper.chat_app.agent.AgentDto;
+import engineer.hyper.chat_app.agent.NewsOrchestratorService;
 import engineer.hyper.chat_app.model.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +23,16 @@ public class OrchestratorService {
     private final ChatClient chatClient;
     private final ChatService chatService;
     private final CodeAssistantService codeAssistantService;
+    private final NewsOrchestratorService newsOrchestratorService;
 
-    public OrchestratorService(ChatClient.Builder builder, ChatService chatService, CodeAssistantService codeAssistantService) {
+    public OrchestratorService(ChatClient.Builder builder,
+                               ChatService chatService,
+                               CodeAssistantService codeAssistantService,
+                               NewsOrchestratorService newsOrchestratorService) {
         this.chatClient = builder.build();
         this.chatService = chatService;
         this.codeAssistantService = codeAssistantService;
+        this.newsOrchestratorService = newsOrchestratorService;
     }
 
     public Flux<ChatResponse> delegateRequest(String conversationId, String question) {
@@ -52,6 +58,15 @@ public class OrchestratorService {
                                             .answer(finalResult)
                                             .finalChunk(true)
                                             .build());
+                        case NEWS_REPORT: // ADDED
+                            return newsOrchestratorService.executeWorkflowReactively(question)
+                                    .map(finalResult -> ChatResponse.builder()
+                                            .orderId(1)
+                                            .question(question)
+                                            .conversationId(conversationId)
+                                            .answer(finalResult)
+                                            .finalChunk(true)
+                                            .build());
                         case GENERAL_CHAT:
                         default:
                             return chatService.streamAnswer(conversationId, question);
@@ -61,10 +76,11 @@ public class OrchestratorService {
 
     private Mono<AgentDto.TaskClassification> classifyTaskReactively(String question) {
         var outputConverter = new BeanOutputConverter<>(AgentDto.TaskClassification.class);
-        // REINFORCED PROMPT: Explicitly name the required fields.
         String systemPrompt = """
-                You are a task classification expert. Your job is to analyze the user's request and classify it.
+                You are a task classification expert. Your job is to analyze the user's request and classify it into one of three categories.
+
                 - If the user is asking to write code, a program, a script, a function, or a class, classify it as 'CODE_GENERATION'.
+                - If the user is asking for a news report, an article, tweets, a summary of a topic, or information on current events, classify it as 'NEWS_REPORT'.
                 - For any other type of request (greetings, questions, general conversation), classify it as 'GENERAL_CHAT'.
 
                 Your response MUST be a single, valid JSON object.
